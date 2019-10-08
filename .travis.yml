@@ -1,0 +1,15 @@
+language: ruby
+dist: bionic
+cache: bundler
+rvm:
+  - 2.6.3
+branches:
+  only:
+    - travis-ci
+env:
+  - JAVSCRIPT_DRIVER=headless_chrome
+services:
+  - postgresql
+addons:
+  postgresql: "11.5"
+  chrome: stable
