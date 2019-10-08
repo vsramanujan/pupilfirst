@@ -13,3 +13,6 @@ services:
 addons:
   postgresql: "11.5"
   chrome: stable
+  apt:
+    packages:
+      - postgresql-11
