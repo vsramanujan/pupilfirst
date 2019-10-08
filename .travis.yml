@@ -8,6 +8,8 @@ branches:
     - travis-ci
 env:
   - JAVSCRIPT_DRIVER=headless_chrome
+  - DB_NAME_TEST=pupilfirst_test
+  - DB_USERNAME=postgres
 services:
   - postgresql
 addons:
@@ -16,3 +18,7 @@ addons:
   apt:
     packages:
       - postgresql-11
+      - postgresql-client-11
+before_script:
+  - psql -c 'create database pupilfirst_test;' -U postgres
+  - cp config/database.travis.yml config/database.yml
