@@ -7,13 +7,16 @@ branches:
   only:
     - travis-ci
 env:
-  - JAVSCRIPT_DRIVER=headless_chrome
-  - DB_NAME_TEST=pupilfirst_test
-  - DB_USERNAME=postgres
+  global:
+    - PGPORT=5433
+    - JAVSCRIPT_DRIVER=headless_chrome
+    - DB_NAME_TEST=pupilfirst_test
+    - DB_USERNAME=postgres
+    - DB_HOST=localhost:5433
 services:
   - postgresql
 addons:
-  postgresql: "11.5"
+  postgresql: "11"
   chrome: stable
   apt:
     packages:
