@@ -72,11 +72,15 @@ class ApplicationController < ActionController::Base
   # unknown domain.
   def current_school
     @current_school ||= begin
-      resolved_school = current_domain&.school
+      if ENV['SINGLE_SCHOOL_MODE'].present?
+        School.first
+      else
+        resolved_school = current_domain&.school
 
-      raise RequestFromUnknownDomain if resolved_school.blank?
+        raise RequestFromUnknownDomain if resolved_school.blank?
 
-      resolved_school
+        resolved_school
+      end
     end
   end
 
