@@ -5,6 +5,7 @@ type props = {
   authenticityToken: string,
   fqdn: string,
   oauthHost: string,
+  ssoEnabled: bool,
 };
 
 let decodeProps = json =>
@@ -13,6 +14,7 @@ let decodeProps = json =>
     authenticityToken: json |> field("authenticityToken", string),
     fqdn: json |> field("fqdn", string),
     oauthHost: json |> field("oauthHost", string),
+    ssoEnabled: json |> field("ssoEnabled", bool),
   };
 
 let props =
@@ -29,6 +31,7 @@ ReactDOMRe.renderToElementWithId(
     authenticityToken={props.authenticityToken}
     fqdn={props.fqdn}
     oauthHost={props.oauthHost}
+    ssoEnabled={props.ssoEnabled}
   />,
   "user-session-new",
 );

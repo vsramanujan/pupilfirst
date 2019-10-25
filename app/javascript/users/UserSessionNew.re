@@ -178,14 +178,16 @@ let iconClasses = provider =>
   | Developer => "fas fa-laptop-code"
   };
 
-let providers = () => {
-  let defaultProvides = [|Google, Facebook, Github|];
+let providers = ssoEnabled => {
+  let defaultProviders = ssoEnabled ? [|Google, Facebook, Github|] : [||];
+
   DomUtils.isDevelopment()
-    ? defaultProvides |> Array.append([|Developer|]) : defaultProvides;
+    ? defaultProviders |> Array.append([|Developer|]) : defaultProviders;
 };
-let renderFederatedlogin = (fqdn, oauthHost) =>
+
+let renderFederatedlogin = (providers, fqdn, oauthHost) =>
   <div className="flex flex-col pb-5 md:px-9 items-center max-w-sm mx-auto">
-    {providers()
+    {providers
      |> Array.map(provider =>
           <a
             key={buttonText(provider)}
@@ -361,12 +363,14 @@ let renderForgotPassword =
   </div>;
 
 [@react.component]
-let make = (~schoolName, ~authenticityToken, ~fqdn, ~oauthHost) => {
+let make = (~schoolName, ~authenticityToken, ~fqdn, ~oauthHost, ~ssoEnabled) => {
   let (view, setView) = React.useState(() => FederatedSignIn);
   let (email, setEmail) = React.useState(() => "");
   let (password, setPassword) = React.useState(() => "");
   let (sharedDevice, setSharedDevice) = React.useState(() => false);
   let (saving, setSaving) = React.useState(() => false);
+
+  let availableProviders = providers(ssoEnabled);
 
   <div className="bg-gray-100 sm:py-10">
     <div
@@ -378,7 +382,9 @@ let make = (~schoolName, ~authenticityToken, ~fqdn, ~oauthHost) => {
         <span className="inline-block"> {schoolName |> str} </span>
       </div>
       {switch (view) {
-       | FederatedSignIn => renderFederatedlogin(fqdn, oauthHost)
+       | FederatedSignIn when availableProviders |> ArrayUtils.isNotEmpty =>
+         renderFederatedlogin(availableProviders, fqdn, oauthHost)
+       | FederatedSignIn
        | SignInWithPassword =>
          renderSignInWithEmail(
            email,
@@ -404,7 +410,7 @@ let make = (~schoolName, ~authenticityToken, ~fqdn, ~oauthHost) => {
          )
        }}
       {switch (view) {
-       | FederatedSignIn =>
+       | FederatedSignIn when availableProviders |> ArrayUtils.isNotEmpty =>
          <div className="max-w-sm mx-auto md:px-9">
            <span
              className="federated-sigin-in__seperator block relative z-10 text-center text-xs text-gray-600 font-semibold">
@@ -422,16 +428,19 @@ let make = (~schoolName, ~authenticityToken, ~fqdn, ~oauthHost) => {
              </span>
            </button>
          </div>
+       | FederatedSignIn
        | SignInWithPassword
        | ForgotPassword =>
-         <div className="max-w-sm mx-auto md:px-9">
-           <button
-             disabled=saving
-             onClick={_ => setView(_ => FederatedSignIn)}
-             className="w-full p-3 text-primary-500 leading-snug rounded-lg underline cursor-pointer text-sm text-center font-semibold hover:bg-gray-200 focus:bg-gray-200 focus:outline-none">
-             {"Sign in with Google, Facebook, or Github" |> str}
-           </button>
-         </div>
+         availableProviders |> ArrayUtils.isEmpty
+           ? React.null
+           : <div className="max-w-sm mx-auto md:px-9">
+               <button
+                 disabled=saving
+                 onClick={_ => setView(_ => FederatedSignIn)}
+                 className="w-full p-3 text-primary-500 leading-snug rounded-lg underline cursor-pointer text-sm text-center font-semibold hover:bg-gray-200 focus:bg-gray-200 focus:outline-none">
+                 {"Sign in using a third-party account" |> str}
+               </button>
+             </div>
 
        | SignInEmailSent => React.null
        }}

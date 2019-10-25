@@ -16,7 +16,8 @@ module Users
           authenticity_token: view.form_authenticity_token,
           school_name: school_name,
           fqdn: view.current_host,
-          oauth_host: oauth_host
+          oauth_host: oauth_host,
+          sso_enabled: Rails.application.secrets.sso_enabled
         }
       end
 
