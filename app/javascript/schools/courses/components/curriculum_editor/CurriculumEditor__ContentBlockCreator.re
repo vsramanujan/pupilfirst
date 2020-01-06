@@ -1,6 +1,40 @@
 [@bs.config {jsx: 3}];
 
+open CurriculumEditor__Types;
+
 let str = React.string;
+
+type visibility =
+  | Hidden
+  | Visible(selection, saving)
+and selection =
+  | Nothing
+  | EmbedBlock
+and saving = bool;
+
+type state = {
+  visibility,
+  errorMessage: option(string),
+  embedUrl: string,
+};
+
+type action =
+  | MakeVisible
+  | Hide
+  | SelectEmbedBlock
+  | UpdateEmbedUrl(string)
+  | Save(selection)
+  | AddError(string);
+
+let reducer = (state, action) =>
+  switch (action) {
+  | MakeVisible => {...state, visibility: Visible(Nothing, false)}
+  | Hide => {...state, visibility: Hidden}
+  | SelectEmbedBlock => {...state, visibility: Visible(EmbedBlock, false)}
+  | UpdateEmbedUrl(embedUrl) => {...state, embedUrl}
+  | Save(selection) => {...state, visibility: Visible(selection, false)}
+  | AddError(error) => {...state, errorMessage: Some(error)}
+  };
 
 type button =
   | MarkdownButton
@@ -8,9 +42,17 @@ type button =
   | ImageButton
   | EmbedButton;
 
-let buttonClasses = (visibility, staticMode) => {
+let containerClasses = (visibility, forceVisible) => {
   let classes = "add-content-block py-3 cursor-pointer";
-  classes ++ (visibility || staticMode ? " add-content-block--open" : " ");
+
+  classes
+  ++ (
+    switch (forceVisible, visibility) {
+    | (true, _)
+    | (false, Visible(_)) => " add-content-block--open"
+    | (false, Hidden) => ""
+    }
+  );
 };
 
 let createContentBlock =
@@ -104,7 +146,7 @@ let submitForm =
   );
 };
 
-let button = (sortIndex, createNewContentBlockCB, button) => {
+let button = (sortIndex, onClick, createContentBlockCB, button) => {
   let (faIcon, buttonText) =
     switch (button) {
     | MarkdownButton => ("fab fa-markdown", "Markdown")
@@ -114,24 +156,25 @@ let button = (sortIndex, createNewContentBlockCB, button) => {
     };
 
   <div
-    key=buttonText
     className="add-content-block__block-content-type-picker px-3 pt-4 pb-3 flex-1 text-center text-primary-200"
-    onClick={event => {event |> ReactEvent.Mouse.preventDefault}}>
+    onClick>
     <i className={faIcon ++ " text-2xl"} />
     <p className="font-semibold"> {buttonText |> str} </p>
   </div>;
 };
 
 [@react.component]
-let make = (~sortIndex, ~staticMode, ~createNewContentBlockCB) => {
-  let (visibility, setVisibility) = React.useState(() => false);
-  <div className={buttonClasses(visibility, staticMode)}>
-    {staticMode
+let make = (~sortIndex, ~forceVisible, ~createContentBlockCB) => {
+  let (state, send) =
+    React.useReducer(reducer, {visibility: Hidden, errorMessage: None});
+
+  <div className={containerClasses(state.visibility, forceVisible)}>
+    {forceVisible
        /* Spacer for add-content-block section */
        ? <div className="h-10" />
        : <div
            className="add-content-block__plus-button-container relative"
-           onClick={_event => setVisibility(_ => !visibility)}>
+           onClick={_event => send(MakeVisible)}>
            <div
              id={"add-block-" ++ (sortIndex |> string_of_int)}
              title="Add block"
@@ -147,6 +190,22 @@ let make = (~sortIndex, ~staticMode, ~createNewContentBlockCB) => {
       {[|MarkdownButton, ImageButton, EmbedButton, FileButton|]
        |> Array.map(button(sortIndex, createNewContentBlockCB))
        |> React.array}
+      {button(
+         sortIndex,
+         createMarkdownBlock(send, createContentBlockCB),
+         MarkdownButton,
+       )}
+      {button(
+         sortIndex,
+         acceptImageFile(send, createContentBlockCB),
+         ImageButton,
+       )}
+      {button(
+         sortIndex,
+         showEmbedBlockForm(send, createContentBlockCB),
+         EmbedButton,
+       )}
+      {button(sortIndex, acceptFile(send, createContentBlockCB), FileButton)}
     </div>
   </div>;
 };
