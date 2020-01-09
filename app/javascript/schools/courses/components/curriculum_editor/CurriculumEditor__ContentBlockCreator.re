@@ -24,7 +24,7 @@ type action =
   | SelectEmbedBlock
   | UpdateEmbedUrl(string)
   | Save(selection)
-  | AddError(string);
+  | SetError(string);
 
 let reducer = (state, action) =>
   switch (action) {
@@ -33,7 +33,7 @@ let reducer = (state, action) =>
   | SelectEmbedBlock => {...state, visibility: Visible(EmbedBlock, false)}
   | UpdateEmbedUrl(embedUrl) => {...state, embedUrl}
   | Save(selection) => {...state, visibility: Visible(selection, false)}
-  | AddError(error) => {...state, errorMessage: Some(error)}
+  | SetError(error) => {...state, errorMessage: Some(error)}
   };
 
 type button =
@@ -68,18 +68,53 @@ let createContentBlock =
   Api.sendFormData(
     "/school/targets/" ++ (target |> Target.id) ++ "/content_block",
     formData,
-    json => {
-      Notification.success("Done!", "Content added successfully.");
-      updateNewContentBlock(
-        json,
-        blockType,
-        sortIndex,
-        state,
-        createNewContentCB,
-      );
-    },
-    () => dispatch(UpdateSaving),
+    json => {()},
+    () => (),
   );
+
+let faIcons = (blockType: ContentBlock.blockType) =>
+  switch (blockType) {
+  | Markdown(_markdown) => React.null
+  | File(_url, _title, _filename) =>
+    <i className="fas fa-file text-6xl text-gray-500" />
+  | Image(_url, _caption) =>
+    <i className="fas fa-image text-6xl text-gray-500" />
+  | Embed(_url, _embedCode) =>
+    [|
+      <i
+        key="youtube-icon"
+        className="fab fa-youtube text-6xl text-gray-500 px-2"
+      />,
+      <i
+        key="slideshare-icon"
+        className="fab fa-slideshare text-6xl text-gray-500 px-2"
+      />,
+      <i
+        key="vimeo-icon"
+        className="fab fa-vimeo text-6xl text-gray-500 px-2"
+      />,
+    |]
+    |> React.array
+  };
+
+let handleFileUpload = (dispatch, event, blockType) => {
+  switch (ReactEvent.Form.target(event)##files) {
+  | [||] => dispatch(SetError("No file selected"))
+  | files =>
+    let file = files[0];
+    let maxFileSize = 5 * 1024 * 1024;
+    let error =
+      file##size > maxFileSize
+        ? Some("The maximum file size is 5 MB. Please select another file.")
+        : None;
+    switch (error) {
+    | Some(errorMessage) =>
+      dispatch(SetError(errorMessage));
+      Notification.error("Upload Error", errorMessage);
+    | None => dispatch(SetError("Failed to upload " ++ file##name))
+    };
+  };
+};
 
 let contentUploadContainer = (blockType, dispatch, state, editorId) =>
   <div
@@ -96,25 +131,17 @@ let contentUploadContainer = (blockType, dispatch, state, editorId) =>
        )
        |> str}
     </p>
-    {fileUploadButtonVisible(blockType)
-       ? <div className="mt-2">
-           <input
-             id={"content-block-editor__file-input-" ++ editorId}
-             type_="file"
-             className="hidden"
-             required=false
-             multiple=false
-             name="content_block[file]"
-             onChange={event => handleFileUpload(dispatch, event, blockType)}
-           />
-           <label
-             className="btn btn-primary"
-             htmlFor={"content-block-editor__file-input-" ++ editorId}>
-             <i className="fas fa-upload" />
-             <span className="ml-2 truncate"> {state.fileName |> str} </span>
-           </label>
-         </div>
-       : React.null}
+    <div className="mt-2">
+      <input
+        id={"content-block-editor__file-input-" ++ editorId}
+        type_="file"
+        className="hidden"
+        required=false
+        multiple=false
+        name="content_block[file]"
+        onChange={event => handleFileUpload(dispatch, event, blockType)}
+      />
+    </div>
   </div>;
 
 let submitForm =
@@ -127,8 +154,9 @@ let submitForm =
       target,
       sortIndex,
       createNewContentCB,
+      selection,
     ) => {
-  dispatch(BeginSaving);
+  dispatch(Save(selection));
   ReactEvent.Form.preventDefault(event);
   let element =
     ReactEvent.Form.target(event) |> DomUtils.EventTarget.unsafeToElement;
@@ -146,7 +174,7 @@ let submitForm =
   );
 };
 
-let button = (sortIndex, onClick, createContentBlockCB, button) => {
+let button = (sortIndex, onClick, send, createContentBlockCB, button) => {
   let (faIcon, buttonText) =
     switch (button) {
     | MarkdownButton => ("fab fa-markdown", "Markdown")
@@ -157,18 +185,39 @@ let button = (sortIndex, onClick, createContentBlockCB, button) => {
 
   <div
     className="add-content-block__block-content-type-picker px-3 pt-4 pb-3 flex-1 text-center text-primary-200"
-    onClick>
+    onClick={_e => onClick(send, createContentBlockCB)}>
     <i className={faIcon ++ " text-2xl"} />
     <p className="font-semibold"> {buttonText |> str} </p>
   </div>;
 };
 
+let createMarkdownBlock = (send, createContentBlockCB) => {
+  ();
+};
+
+let acceptImageFile = (send, createContentBlockCB) => {
+  ();
+};
+
+let showEmbedBlockForm = (send, createContentBlockCB) => {
+  ();
+};
+
+let acceptFile = (send, createContentBlockCB) => {
+  ();
+};
+
 [@react.component]
 let make = (~sortIndex, ~forceVisible, ~createContentBlockCB) => {
   let (state, send) =
-    React.useReducer(reducer, {visibility: Hidden, errorMessage: None});
+    React.useReducer(
+      reducer,
+      {visibility: Hidden, errorMessage: None, embedUrl: ""},
+    );
 
-  <div className={containerClasses(state.visibility, forceVisible)}>
+  <form
+    id={"create-content-block-" ++ (sortIndex |> string_of_int)}
+    className={containerClasses(state.visibility, forceVisible)}>
     {forceVisible
        /* Spacer for add-content-block section */
        ? <div className="h-10" />
@@ -187,25 +236,28 @@ let make = (~sortIndex, ~forceVisible, ~createContentBlockCB) => {
     <div
       className="add-content-block__block-content-type text-sm hidden shadow-lg mx-auto relative bg-primary-900 rounded-lg -mt-4 z-10"
       id={"content-type-picker-" ++ (sortIndex |> string_of_int)}>
-      {[|MarkdownButton, ImageButton, EmbedButton, FileButton|]
-       |> Array.map(button(sortIndex, createNewContentBlockCB))
-       |> React.array}
       {button(
          sortIndex,
-         createMarkdownBlock(send, createContentBlockCB),
+         createMarkdownBlock,
+         send,
+         createContentBlockCB,
          MarkdownButton,
        )}
       {button(
          sortIndex,
-         acceptImageFile(send, createContentBlockCB),
+         acceptImageFile,
+         send,
+         createContentBlockCB,
          ImageButton,
        )}
       {button(
          sortIndex,
-         showEmbedBlockForm(send, createContentBlockCB),
+         showEmbedBlockForm,
+         send,
+         createContentBlockCB,
          EmbedButton,
        )}
-      {button(sortIndex, acceptFile(send, createContentBlockCB), FileButton)}
+      {button(sortIndex, acceptFile, send, createContentBlockCB, FileButton)}
     </div>
-  </div>;
+  </form>;
 };

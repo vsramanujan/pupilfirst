@@ -22,12 +22,7 @@ let updateContentBlockSorting =
     ) => {
   let contentBlockIds =
     contentBlocks
-    |> List.map(((_, _, cb, id)) =>
-         switch (cb) {
-         | Some(_cb) => id
-         | None => ""
-         }
-       )
+    |> List.map(((_, _, cb, id)) => id)
     |> List.filter(id => id != "")
     |> Array.of_list;
 
@@ -241,8 +236,8 @@ let make =
                 sortIndex + 1;
               }
             }
-            staticMode=true
-            createNewContentCB={createNewContentCB(
+            forceVisible=true
+            createContentBlockCB={createNewContentCB(
               addNewVersionCB,
               updateTargetContentBlocks,
             )}
@@ -255,15 +250,15 @@ let make =
                     <CurriculumEditor__ContentBlockCreator
                       key={sortIndex |> string_of_int}
                       sortIndex
-                      createNewContentCB={createNewContentCB(
+                      createContentBlockCB={createNewContentCB(
                         addNewVersionCB,
                         updateTargetContentBlocks,
                       )}
-                      staticMode=false
+                      forceVisible=false
                     />
                     <CurriculumEditor__ContentBlockEditor
-                      editorId=id
                       target
+                      editorId=id
                       contentBlock
                       removeTargetContentCB={removeTargetContentCB(
                         contentBlock,
@@ -272,20 +267,18 @@ let make =
                         updateTargetContentBlocks,
                         toggleSortContentBlock,
                       )}
-                      blockType
                       sortIndex
-                      updateContentBlockCB={updateContentBlockCB(
-                        addNewVersionCB,
-                        updateTargetContentBlocks,
-                      )}
                       blockCount={targetContentBlocks |> List.length}
                       swapContentBlockCB={swapContentBlockCB(
                         sortedContentBlocks,
                         updateTargetContentBlocks,
                         toggleSortContentBlock,
                       )}
+                      updateContentBlockCB={updateContentBlockCB(
+                        addNewVersionCB,
+                        updateTargetContentBlocks,
+                      )}
                       targetContentBlocks
-                      authenticityToken
                     />
                   </div>
                 )

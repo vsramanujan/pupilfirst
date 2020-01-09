@@ -17,41 +17,31 @@ let quizIcon: string = [%raw
 let str = ReasonReact.string;
 
 type step =
-  | AddContent
-  | TargetActions;
+  | EditContent
+  | EditDetails;
 
-type targetFieldErrors = {
-  title: bool,
-  linkToComplete: bool,
-  quiz: bool,
-};
-
-type loadedState = {
+type state = {
+  target: Target.t,
+  step,
   role: Role.t,
   prerequisiteTargetIds: list(string),
   methodOfCompletion: MethodOfCompletion.t,
   completionInstructions: option(string),
   contentBlocks: list(ContentBlock.t),
+  dirtyContentBlockIds: list(ContentBlock.id),
   versions: array(string),
   selectedVersion: string,
   previewMode: bool,
-  targetFieldErrors,
+  hasLinktoCompleteError: bool,
+  hasTitleError: bool,
+  hasQuizError: bool,
   targetFieldsDirty: bool,
-};
-
-type networkState =
-  | EditorLoaded(loadedState)
-  | EditorLoading
-  | EditorSaving;
-
-type state = {
-  target: Target.t,
-  step,
-  networkState,
+  saving: bool,
 };
 
 type action =
-  | UpdateTitle(string)
+  | UpdateTitle(string, bool)
+  | UpdateLinkToComplete(string, bool)
   | AddEvaluationCriterion(string)
   | RemoveEvaluationCriterion(string)
   | AddPrerequisiteTarget(string)
@@ -82,21 +72,21 @@ let updateLinkToComplete = (send, link) => {
 };
 
 let saveDisabled = state => {
-  let hasMethordOfCompletionError =
+  let hasMethodOfCompletionError =
     switch (state.methodOfCompletion) {
-    | Evaluated =>
-      state.evaluationCriteria
-      |> List.filter(((_, _, selected)) => selected)
-      |> List.length == 0
-    | VisitLink => state.hasLinktoCompleteError
-    | TakeQuiz => !state.isValidQuiz
+    | MethodOfCompletion.Evaluated(evaluationCriteriaIds) =>
+      evaluationCriteriaIds |> List.length == 0
+    | VisitLink(_) => state.hasLinktoCompleteError
+    | TakeQuiz(_) => state.hasQuizError
     | MarkAsComplete => false
     };
-  state.title
+
+  state.target
+  |> Target.title
   |> String.length < 2
   || state.hasLinktoCompleteError
-  || hasMethordOfCompletionError
-  || !state.dirty
+  || hasMethodOfCompletionError
+  || !state.targetFieldsDirty
   || state.saving;
 };
 
@@ -551,9 +541,20 @@ let switchViewModeCB = (send, previewMode) =>
   send(SwitchPreviewMode(previewMode));
 
 let computeInitialState =
-    (target, targets, evaluationCriteria, targetGroupIdsInLevel) => {
+    (
+      target,
+      role,
+      prerequisiteTargetIds,
+      methodOfCompletion,
+      completionInstructions,
+      contentBlocks,
+      versions,
+      targets,
+      evaluationCriteria,
+      targetGroupIdsInLevel,
+    ) => {
   title: target |> Target.title,
-  role: target |> Target.role,
+  role,
   evaluationCriteria:
     cacheCurrentEvaluationCriteria(evaluationCriteria, target),
   prerequisiteTargets:
@@ -589,6 +590,12 @@ let computeInitialState =
 let make =
     (
       ~target,
+      ~role,
+      ~prerequisiteTargetIds,
+      ~methodOfCompletion,
+      ~completionInstructions,
+      ~contentBlocks,
+      ~versions,
       ~targetGroupId,
       ~evaluationCriteria,
       ~targets,
@@ -600,7 +607,18 @@ let make =
   let (state, dispatch) =
     React.useReducerWithMapState(
       reducer,
-      (target, targets, evaluationCriteria, targetGroupIdsInLevel),
+      (
+        target,
+        role,
+        prerequisiteTargetIds,
+        methodOfCompletion,
+        completionInstructions,
+        contentBlocks,
+        versions,
+        targets,
+        evaluationCriteria,
+        targetGroupIdsInLevel,
+      ),
       computeInitialState,
     );
 
